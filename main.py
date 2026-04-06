@@ -72,7 +72,7 @@ bg_x = [0, BACKGROUND_WIDTH, BACKGROUND_WIDTH * 2]
 
 # Hangok
 try:
-    pygame.mixer.music.load("background_music.mp3")
+    pygame.mixer.music.load("background_music.ogg")
 except:
     pass
 
