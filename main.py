@@ -32,7 +32,7 @@ def load_sd(name):
     except:
         return None
 
-# --- ASSETS (Kisbetűs fájlnevek a GitHubhoz igazítva) ---
+# --- ASSETS ---
 RUNNING = [load_img("ViktorRun1.png"), load_img("ViktorRun2.png")]
 JUMPING = load_img("ViktorJump.png")
 DUCKING = [load_img("ViktorDuck1.png"), load_img("ViktorDuck2.png")]
@@ -61,4 +61,28 @@ game_over_sound = load_sd("game_over.ogg")
 class Viktosaur:
     X_POS = 80
     Y_POS = 310
-    Y_POS
+    Y_POS_DUCK = 340
+    JUMP_VEL = 8.5
+
+    def __init__(self):
+        self.image = RUNNING[0]
+        self.rect = self.image.get_rect(topleft=(self.X_POS, self.Y_POS))
+        self.step_index = 0
+        self.jump_vel = self.JUMP_VEL
+        self.is_run, self.is_jump, self.is_duck = True, False, False
+        self.mask = pygame.mask.from_surface(self.image)
+
+    def update(self, userInput, jump_input, duck_input):
+        if self.is_run: self.run()
+        if self.is_jump: self.jump()
+        if self.is_duck: self.duck()
+
+        if self.step_index >= 10: self.step_index = 0
+
+        # Irányítás kombinálása (Billentyűzet + Egér/Érintés)
+        if (userInput[pygame.K_UP] or jump_input) and not self.is_jump:
+            self.is_run, self.is_jump, self.is_duck = False, True, False
+            if jump_sound: jump_sound.play()
+        elif (userInput[pygame.K_DOWN] or duck_input) and not self.is_jump:
+            if not self.is_duck and duck_sound: 
+                duck_sound.play()
