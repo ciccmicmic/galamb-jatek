@@ -58,7 +58,7 @@ LANDING_PAGE = load_img("landingpage.png", (SCREEN_WIDTH, SCREEN_HEIGHT))
 
 # Speciális Háttérkezelés (Panoráma mód)
 try:
-    orig_bg = pygame.image.load(get_path("background.jpg")).convert()
+    orig_bg = pygame.image.load(get_path("background.png")).convert()
     bg_ratio = orig_bg.get_width() / orig_bg.get_height()
     BACKGROUND = pygame.transform.scale(orig_bg, (int(600 * bg_ratio), 600))
 except:
