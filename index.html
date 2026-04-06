@@ -20,7 +20,6 @@
             display: block; image-rendering: -webkit-optimize-contrast; 
         }
         
-        /* NAGYOBB, RÉSZLETGAZDAG MENÜ */
         #menu { 
             position: absolute; 
             top: 50%; left: 50%; 
@@ -34,33 +33,9 @@
             max-width: 850px; 
             box-shadow: 0 0 50px rgba(0,0,0,0.6); 
         }
-        #menu img { 
-            width: 100%; 
-            border-radius: 12px; 
-            margin-bottom: 20px; 
-        }
-        input { 
-            padding: 15px; 
-            width: 70%; 
-            margin-bottom: 20px; 
-            font-size: 20px; 
-            border-radius: 10px; 
-            border: 2px solid #ccc; 
-            outline: none; 
-        }
-        button { 
-            padding: 18px; 
-            width: 80%; 
-            background: #e74c3c; 
-            color: white; 
-            border: none; 
-            border-radius: 12px; 
-            font-size: 24px; 
-            font-weight: bold; 
-            cursor: pointer; 
-            transition: transform 0.1s;
-        }
-        button:active { transform: scale(0.98); }
+        #menu img { width: 100%; border-radius: 12px; margin-bottom: 20px; }
+        input { padding: 15px; width: 70%; margin-bottom: 20px; font-size: 20px; border-radius: 10px; border: 2px solid #ccc; outline: none; }
+        button { padding: 18px; width: 80%; background: #e74c3c; color: white; border: none; border-radius: 12px; font-size: 24px; font-weight: bold; cursor: pointer; }
     </style>
 </head>
 <body>
@@ -88,21 +63,18 @@ let playerName = "";
 let bgX = 0;
 let lastTime = 0;
 
-// --- ASSETEK BETÖLTÉSE ---
 function loadImg(src) { const img = new Image(); img.src = src; return img; }
 const imgRun = [loadImg("ViktorRun1.png"), loadImg("ViktorRun2.png")];
 const imgJump = loadImg("ViktorJump.png");
 const imgDuck = [loadImg("ViktorDuck1.png"), loadImg("ViktorDuck2.png")];
 const imgBg = loadImg("background.png"); 
 
-// AKADÁLYOK LISTÁJA
 const helis = [loadImg("heli1.png"), loadImg("heli2.png")];
 const avos = [
     loadImg("SmallAvocado1.png"), loadImg("SmallAvocado2.png"), loadImg("SmallAvocado3.png"),
     loadImg("LargeAvocado1.png"), loadImg("LargeAvocado2.png"), loadImg("LargeAvocado3.png")
 ];
 
-// --- HANGOK ---
 const bgMusic = new Audio("background_music.ogg");
 bgMusic.loop = true;
 const sndJump = new Audio("jump.ogg");
@@ -164,12 +136,24 @@ function update(dt) {
     }
 
     obstacleTimer += dt;
-    if (obstacleTimer > 1.6) {
-        if (Math.random() < 0.03) {
-            const isHeli = Math.random() > 0.7;
-            let selectedImg = isHeli ? helis[Math.floor(Math.random() * helis.length)] : avos[Math.floor(Math.random() * avos.length)];
+    if (obstacleTimer > 1.4) {
+        if (Math.random() < 0.04) {
+            const isHeli = Math.random() > 0.65;
+            let selectedImg, spawnY;
+            
+            if (isHeli) {
+                selectedImg = helis[Math.floor(Math.random() * helis.length)];
+                // VÉLETLENSZERŰ MAGASSÁG HELIKOPTERNEK
+                const heightRoll = Math.random();
+                if (heightRoll < 0.33) spawnY = 430; // Alacsony (át kell ugrani)
+                else if (heightRoll < 0.66) spawnY = 320; // Közepes (guggolni vagy ugrani kell)
+                else spawnY = 220; // Magas (maradj a földön!)
+            } else {
+                selectedImg = avos[Math.floor(Math.random() * avos.length)];
+                spawnY = 430; // Avokádó marad a földön
+            }
 
-            obstacles.push({ x: 1150, y: isHeli ? 280 : 430, w: 85, h: 85, img: selectedImg });
+            obstacles.push({ x: 1150, y: spawnY, w: 85, h: 85, img: selectedImg });
             obstacleTimer = 0;
         }
     }
@@ -185,11 +169,7 @@ function update(dt) {
              bgMusic.volume = 0.1;
              sndGameOver.volume = 1.0;
              sndGameOver.play();
-
-             setTimeout(() => {
-                 bgMusic.pause();
-                 location.reload(); 
-             }, 3500);
+             setTimeout(() => { bgMusic.pause(); location.reload(); }, 3500);
         }
         if (obs.x < -200) obstacles.splice(i, 1);
     }
