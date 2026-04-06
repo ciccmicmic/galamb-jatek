@@ -6,7 +6,6 @@
     <title>NER-lovag Kalandjai</title>
     <style>
         body { margin: 0; overflow: hidden; background: #000; display: flex; justify-content: center; align-items: center; height: 100vh; font-family: sans-serif; 
-            /* Letiltjuk a gyári gesztusokat a késleltetés ellen */
             touch-action: none; 
             -webkit-user-select: none;
             user-select: none;
@@ -50,9 +49,14 @@ const imgJump = loadImg("ViktorJump.png");
 const imgDuck = [loadImg("ViktorDuck1.png"), loadImg("ViktorDuck2.png")];
 const imgBg = loadImg("background.png"); 
 const imgHeli = [loadImg("heli1.png"), loadImg("heli2.png")];
-const imgAvo = [loadImg("SmallAvocado1.png"), loadImg("LargeAvocado1.png")];
 
-// HANGOK (Pre-loaded & Pooled)
+// --- JAVÍTVA: LargeAvocado2 hozzáadva a listához ---
+const imgAvo = [
+    loadImg("SmallAvocado1.png"), 
+    loadImg("LargeAvocado1.png"), 
+    loadImg("LargeAvocado2.png")
+];
+
 const bgMusic = new Audio("background_music.ogg");
 bgMusic.loop = true;
 const sndJump = new Audio("jump.ogg");
@@ -74,7 +78,6 @@ function startGame(e) {
     requestAnimationFrame(gameLoop);
 }
 
-// Mobilon a "touchstart" a leggyorsabb
 startBtn.addEventListener('touchstart', startGame, {passive: false});
 startBtn.addEventListener('click', startGame);
 
@@ -90,14 +93,12 @@ function inputEnd(e) {
     if(duration < 180 && !player.isJumping) {
         player.velY = -580; 
         player.isJumping = true;
-        // Azonnali hangindítás mobilon
         sndJump.currentTime = 0;
         sndJump.play().catch(()=>{});
     }
     isTouching = false; player.isDucking = false;
 }
 
-// Mobilos események kényszerített azonnali reakcióval
 window.addEventListener('touchstart', (e) => {
     if (menu.style.display === 'none') {
         e.preventDefault();
@@ -111,14 +112,13 @@ window.addEventListener('touchend', (e) => {
     }
 }, {passive: false});
 
-// Desktop támogatás marad
 window.addEventListener('mousedown', inputStart);
 window.addEventListener('mouseup', inputEnd);
 
 function gameLoop(timestamp) {
     if (!gameRunning) return;
     let deltaTime = (timestamp - lastTime) / 1000; 
-    if (deltaTime > 0.05) deltaTime = 0.016; // 60FPS környékén tartjuk
+    if (deltaTime > 0.05) deltaTime = 0.016;
     lastTime = timestamp;
 
     update(deltaTime);
@@ -140,7 +140,15 @@ function update(dt) {
     if (obstacleTimer > 1.6) {
         if (Math.random() < 0.02) {
             const isHeli = Math.random() > 0.7;
-            obstacles.push({ x: 1150, y: isHeli ? 280 : 430, w: 85, h: 85, img: isHeli ? imgHeli[0] : imgAvo[0] });
+            // Véletlenszerűen választunk az avokádók közül
+            const avoImg = imgAvo[Math.floor(Math.random() * imgAvo.length)];
+            
+            obstacles.push({ 
+                x: 1150, 
+                y: isHeli ? 280 : 430, 
+                w: 85, h: 85, 
+                img: isHeli ? imgHeli[0] : avoImg 
+            });
             obstacleTimer = 0;
         }
     }
@@ -168,7 +176,6 @@ function draw() {
     const bgScale = 600 / imgBg.height;
     const bgW = imgBg.width * bgScale;
     
-    // Egész pixelre kerekítés a jobb teljesítményért
     let bX = Math.round(bgX);
     ctx.drawImage(imgBg, bX, 0, bgW, 600);
     if (bX + bgW < 1100) { ctx.drawImage(imgBg, bX + Math.round(bgW), 0, bgW, 600); }
