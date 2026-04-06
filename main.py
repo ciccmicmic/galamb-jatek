@@ -1,197 +1,162 @@
 import pygame
-import os
 import random
 import asyncio
+import os
 
+# Inicializálás
 pygame.init()
 pygame.mixer.init()
 
 # Ablak méretei
-SCREEN_HEIGHT = 600
 SCREEN_WIDTH = 1100
+SCREEN_HEIGHT = 600
 SCREEN = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
 pygame.display.set_caption("Vége van kicsi")
 
-# Segédfüggvény a fájlok betöltéséhez (ha nincs mappa, akkor is megtalálja)
+# --- SEGÉDFÜGGVÉNYEK A BIZTONSÁGOS BETÖLTÉSHEZ ---
 def get_path(filename):
-    # Megpróbálja az Assets mappákban, ha nem sikerül, nézi simán a főkönyvtárban
-    possible_paths = [
+    paths = [
         filename,
-        os.path.join("Assets/Sounds", filename),
         os.path.join("Assets/Viktor", filename),
+        os.path.join("Assets/Sounds", filename),
         os.path.join("Assets/Avocado", filename),
         os.path.join("Assets/Heli", filename),
-        os.path.join("Assets/Other", filename)
+        os.path.join("Assets/Other", filename),
+        os.path.join("assets", filename)
     ]
-    for p in possible_paths:
+    for p in paths:
         if os.path.exists(p):
             return p
     return filename
 
-def load_sound_web(name):
-    try:
-        return pygame.mixer.Sound(get_path(name))
-    except:
-        return None
-
-def load_img_web(name, scale=None):
+def load_img(name, scale=None):
     try:
         img = pygame.image.load(get_path(name)).convert_alpha()
         if scale:
             img = pygame.transform.scale(img, scale)
         return img
     except:
-        # Ha nincs kép, egy piros kockát ad vissza, hogy ne fagyjon le
-        s = pygame.Surface((50, 50))
-        s.fill((255, 0, 0))
-        return s
+        surf = pygame.Surface(scale if scale else (50, 50))
+        surf.fill((255, 0, 0))
+        return surf
 
-# Assets betöltése
+def load_sd(name):
+    try:
+        return pygame.mixer.Sound(get_path(name))
+    except:
+        return None
+
+# --- ASSETS BETÖLTÉSE ---
+RUNNING = [load_img("ViktorRun1.png"), load_img("ViktorRun2.png")]
+JUMPING = load_img("ViktorJump.png")
+DUCKING = [load_img("ViktorDuck1.png"), load_img("ViktorDuck2.png")]
+SMALL_AVOCADO = [load_img("SmallAvocado1.png"), load_img("SmallAvocado2.png"), load_img("SmallAvocado3.png")]
+LARGE_AVOCADO = [load_img("LargeAvocado1.png"), load_img("LargeAvocado2.png")]
+HELI = [load_img("Heli1.png"), load_img("Heli2.png")]
+CLOUD = load_img("Cloud.png")
+LANDING_PAGE = load_img("landingpage.png", (SCREEN_WIDTH, SCREEN_HEIGHT))
+
+# Speciális Háttérkezelés (Panoráma mód)
 try:
-    jump_sound = load_sound_web("jump.ogg")
-    duck_sound = load_sound_web("duck.ogg")
-    collision_sound = load_sound_web("collision.ogg")
-    coin_sound = load_sound_web("coin.ogg")
-    game_over_sound = load_sound_web("game_over.ogg")
-    
-    RUNNING = [load_img_web("ViktorRun1.png"), load_img_web("ViktorRun2.png")]
-    JUMPING = load_img_web("ViktorJump.png")
-    DUCKING = [load_img_web("ViktorDuck1.png"), load_img_web("ViktorDuck2.png")]
-    SMALL_AVOCADO = [load_img_web("SmallAvocado1.png"), load_img_web("SmallAvocado2.png"), load_img_web("SmallAvocado3.png")]
-    LARGE_AVOCADO = [load_img_web("LargeAvocado1.png"), load_img_web("LargeAvocado2.png")]
-    HELI = [load_img_web("Heli1.png"), load_img_web("Heli2.png")]
-    CLOUD = load_img_web("Cloud.png")
-    BACKGROUND = load_img_web("background.png", (SCREEN_WIDTH, SCREEN_HEIGHT))
-    BG = load_img_web("Track.png")
-    LANDING_PAGE = load_img_web("landingpage.png", (SCREEN_WIDTH, SCREEN_HEIGHT))
+    orig_bg = pygame.image.load(get_path("background.jpg")).convert()
+    bg_ratio = orig_bg.get_width() / orig_bg.get_height()
+    BACKGROUND = pygame.transform.scale(orig_bg, (int(600 * bg_ratio), 600))
 except:
-    pass
+    BACKGROUND = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT))
+    BACKGROUND.fill((200, 200, 200))
 
+# Hangok
+jump_sound = load_sd("jump.ogg")
+duck_sound = load_sd("duck.ogg")
+collision_sound = load_sd("collision.ogg")
+coin_sound = load_sd("coin.ogg")
+game_over_sound = load_sd("game_over.ogg")
+
+# --- OSZTÁLYOK ---
 class Viktosaur:
     X_POS = 80
     Y_POS = 310
     Y_POS_DUCK = 340
     JUMP_VEL = 8.5
-    GROUND_LEVEL = 380
 
     def __init__(self):
-        self.duck_img = DUCKING
-        self.run_img = RUNNING
-        self.jump_img = JUMPING
-        self.Viktor_duck = False
-        self.Viktor_run = True
-        self.Viktor_jump = False
+        self.image = RUNNING[0]
+        self.rect = self.image.get_rect(topleft=(self.X_POS, self.Y_POS))
         self.step_index = 0
         self.jump_vel = self.JUMP_VEL
-        self.image = self.run_img[0]
-        self.Viktor_rect = self.image.get_rect()
-        self.Viktor_rect.x = self.X_POS
-        self.Viktor_rect.y = self.Y_POS
+        self.is_run, self.is_jump, self.is_duck = True, False, False
         self.mask = pygame.mask.from_surface(self.image)
 
     def update(self, userInput):
-        if self.Viktor_duck: self.duck()
-        if self.Viktor_run: self.run()
-        if self.Viktor_jump: self.jump()
+        if self.is_run: self.run()
+        if self.is_jump: self.jump()
+        if self.is_duck: self.duck()
+
         if self.step_index >= 10: self.step_index = 0
 
-        if userInput[pygame.K_UP] and not self.Viktor_jump:
-            self.Viktor_duck = False
-            self.Viktor_run = False
-            self.Viktor_jump = True
+        if userInput[pygame.K_UP] and not self.is_jump:
+            self.is_run, self.is_jump, self.is_duck = False, True, False
             if jump_sound: jump_sound.play()
-        elif userInput[pygame.K_DOWN] and not self.Viktor_jump:
-            self.Viktor_duck = True
-            self.Viktor_run = False
-            self.Viktor_jump = False
+        elif userInput[pygame.K_DOWN] and not self.is_jump:
+            self.is_run, self.is_jump, self.is_duck = False, False, True
             if duck_sound: duck_sound.play()
-        elif not (self.Viktor_jump or userInput[pygame.K_DOWN]):
-            self.Viktor_duck = False
-            self.Viktor_run = True
-            self.Viktor_jump = False
+        elif not (self.is_jump or userInput[pygame.K_DOWN]):
+            self.is_run, self.is_jump, self.is_duck = True, False, False
 
-    def duck(self):
-        self.image = self.duck_img[self.step_index // 5]
-        self.Viktor_rect = self.image.get_rect()
-        self.Viktor_rect.x = self.X_POS
-        self.Viktor_rect.y = self.Y_POS_DUCK
+    def run(self):
+        self.image = RUNNING[self.step_index // 5]
+        self.rect = self.image.get_rect(topleft=(self.X_POS, self.Y_POS))
         self.step_index += 1
         self.mask = pygame.mask.from_surface(self.image)
 
-    def run(self):
-        self.image = self.run_img[self.step_index // 5]
-        self.Viktor_rect = self.image.get_rect()
-        self.Viktor_rect.x = self.X_POS
-        self.Viktor_rect.y = self.Y_POS
+    def duck(self):
+        self.image = DUCKING[self.step_index // 5]
+        self.rect = self.image.get_rect(topleft=(self.X_POS, self.Y_POS_DUCK))
         self.step_index += 1
         self.mask = pygame.mask.from_surface(self.image)
 
     def jump(self):
-        self.image = self.jump_img
-        if self.Viktor_jump:
-            self.Viktor_rect.y -= self.jump_vel * 4
+        self.image = JUMPING
+        if self.is_jump:
+            self.rect.y -= self.jump_vel * 4
             self.jump_vel -= 0.8
-            if self.Viktor_rect.y >= self.GROUND_LEVEL - self.image.get_height():
-                self.Viktor_rect.y = self.GROUND_LEVEL - self.image.get_height()
-                self.Viktor_jump = False
-                self.jump_vel = self.JUMP_VEL
+        if self.rect.y >= self.Y_POS:
+            self.rect.y = self.Y_POS
+            self.is_jump = False
+            self.jump_vel = self.JUMP_VEL
         self.mask = pygame.mask.from_surface(self.image)
 
-    def draw(self, SCREEN):
-        SCREEN.blit(self.image, (self.Viktor_rect.x, self.Viktor_rect.y))
-
-class Cloud:
-    def __init__(self):
-        self.x = SCREEN_WIDTH + random.randint(800, 1000)
-        self.y = random.randint(100, 150)
-        self.image = CLOUD
-        self.width = self.image.get_width()
-        self.rect = self.image.get_rect(topleft=(self.x, self.y))
-        self.mask = pygame.mask.from_surface(self.image)
-        self.visible = True
-
-    def update(self, game_speed):
-        if self.visible:
-            self.x -= game_speed * 0.5
-        if self.x < -self.width:
-            self.x = SCREEN_WIDTH + random.randint(2500, 3000)
-            self.y = random.randint(50, 100)
-            self.visible = True
-        self.rect.x, self.rect.y = int(self.x), int(self.y)
-
-    def draw(self, SCREEN):
-        if self.visible: SCREEN.blit(self.image, (self.x, self.y))
+    def draw(self, screen):
+        screen.blit(self.image, self.rect)
 
 class Obstacle:
-    def __init__(self, image, type):
-        self.image = image
-        self.type = type
-        self.rect = self.image[self.type].get_rect()
-        self.rect.x = SCREEN_WIDTH
-        self.rect.y = 370
-        self.mask = pygame.mask.from_surface(self.image[self.type])
+    def __init__(self, images):
+        self.images = images
+        self.type = random.randint(0, len(images) - 1)
+        self.image = self.images[self.type]
+        self.rect = self.image.get_rect(topleft=(SCREEN_WIDTH, 370))
+        self.mask = pygame.mask.from_surface(self.image)
 
-    def update(self, game_speed, obstacles):
-        self.rect.x -= game_speed
+    def update(self, speed, obstacles):
+        self.rect.x -= speed
         if self.rect.x < -self.rect.width:
             obstacles.pop(0)
 
-    def draw(self, SCREEN):
-        SCREEN.blit(self.image[self.type], self.rect)
+    def draw(self, screen):
+        screen.blit(self.image, self.rect)
 
-# Fő játék ciklus aszinkron módon
-async def main_game(player_name_val):
-    global game_speed, points, obstacles
+# --- FŐ JÁTÉK CIKLUS ---
+async def main_game(name):
+    global game_speed, x_pos_bg, points, obstacles
     run = True
     clock = pygame.time.Clock()
     player = Viktosaur()
-    cloud = Cloud()
-    game_speed = 20
+    game_speed = 15
+    x_pos_bg = 0
     points = 0
     obstacles = []
-    font = pygame.font.Font(None, 24)
+    font = pygame.font.Font(None, 30)
 
-    # Zene indítása
     try:
         pygame.mixer.music.load(get_path("background_music.ogg"))
         pygame.mixer.music.play(-1)
@@ -200,76 +165,73 @@ async def main_game(player_name_val):
 
     while run:
         for event in pygame.event.get():
-            if event.type == pygame.QUIT:
-                return
+            if event.type == pygame.QUIT: return
 
         SCREEN.fill((255, 255, 255))
-        SCREEN.blit(BACKGROUND, (0, 0))
-
-        cloud.draw(SCREEN)
-        cloud.update(game_speed)
+        
+        # Panoráma háttér rajzolása
+        SCREEN.blit(BACKGROUND, (x_pos_bg, 0))
+        if x_pos_bg + BACKGROUND.get_width() < SCREEN_WIDTH:
+            SCREEN.blit(BACKGROUND, (x_pos_bg + BACKGROUND.get_width(), 0))
+        
+        x_pos_bg -= game_speed * 0.5
+        if x_pos_bg <= -BACKGROUND.get_width(): x_pos_bg = 0
 
         userInput = pygame.key.get_pressed()
         player.draw(SCREEN)
         player.update(userInput)
 
         if len(obstacles) == 0:
-            r = random.randint(0, 2)
-            if r == 0: obstacles.append(Obstacle(SMALL_AVOCADO, random.randint(0, 2)))
-            elif r == 1: obstacles.append(Obstacle(LARGE_AVOCADO, random.randint(0, 1)))
-            elif r == 2: 
-                h = Obstacle(HELI, 0)
-                h.rect.y = 300
+            choice = random.randint(0, 2)
+            if choice == 0: obstacles.append(Obstacle(SMALL_AVOCADO))
+            elif choice == 1: obstacles.append(Obstacle(LARGE_AVOCADO))
+            elif choice == 2:
+                h = Obstacle(HELI)
+                h.rect.y = 280
                 obstacles.append(h)
 
         for obstacle in obstacles:
             obstacle.draw(SCREEN)
             obstacle.update(game_speed, obstacles)
-            if player.mask.overlap(obstacle.mask, (obstacle.rect.x - player.Viktor_rect.x, obstacle.rect.y - player.Viktor_rect.y)):
+            if player.mask.overlap(obstacle.mask, (obstacle.rect.x - player.rect.x, obstacle.rect.y - player.rect.y)):
                 if collision_sound: collision_sound.play()
                 pygame.mixer.music.stop()
                 if game_over_sound: game_over_sound.play()
                 await asyncio.sleep(2)
-                return points # Visszatérünk a pontszámmal a menübe
+                return
 
-        # Pontszám és felhő ütközés
         points += 1
-        score_txt = font.render(f"{player_name_val} - Pontok: {points}", True, (0, 0, 0))
-        SCREEN.blit(score_txt, (800, 40))
+        if points % 100 == 0: game_speed += 1
+        txt = font.render(f"Pilóta: {name} | Pont: {points}", True, (0, 0, 0))
+        SCREEN.blit(txt, (40, 40))
 
         pygame.display.update()
         clock.tick(30)
         await asyncio.sleep(0)
 
-# Menü aszinkron módon
+# --- MENÜ ---
 async def menu():
     player_name = ""
-    font = pygame.font.Font(None, 40)
-    input_active = True
+    font = pygame.font.Font(None, 50)
     
     while True:
         SCREEN.blit(LANDING_PAGE, (0, 0))
-        
-        events = pygame.event.get()
-        for event in events:
-            if event.type == pygame.QUIT:
-                return
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT: return
             if event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_RETURN and player_name:
-                    final_points = await main_game(player_name)
-                    # Itt lehetne menteni a pontszámot, de weben a fájlba írás korlátozott
-                    player_name = "" # Reset a következő körhöz
+                    await main_game(player_name)
+                    player_name = ""
                 elif event.key == pygame.K_BACKSPACE:
                     player_name = player_name[:-1]
                 else:
-                    if len(player_name) < 10:
+                    if len(player_name) < 12:
                         player_name += event.unicode
 
-        txt = font.render("Írd be a neved és nyomj ENTER-t:", True, (0, 0, 0))
-        SCREEN.blit(txt, (SCREEN_WIDTH//2 - 200, SCREEN_HEIGHT//2 - 50))
-        
-        name_txt = font.render(player_name + "_", True, (0, 0, 255))
-        SCREEN.blit(name_txt, (SCREEN_WIDTH//2 - 50, SCREEN_HEIGHT//2 + 20))
+        msg = font.render("Írd be a neved és nyomj ENTER-t!", True, (0, 0, 0))
+        SCREEN.blit(msg, (SCREEN_WIDTH//2 - 250, SCREEN_HEIGHT//2 - 50))
+        name_surf = font.render(player_name + "_", True, (255, 0, 0))
+        SCREEN.blit(name_surf, (SCREEN_WIDTH//2 - 50, SCREEN_HEIGHT//2 + 20))
 
         pygame.display.update()
         await asyncio.sleep(0)
