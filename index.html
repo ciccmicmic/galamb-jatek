@@ -5,38 +5,56 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>NER-lovag Kalandjai</title>
     <style>
-        /* Sötét háttér a széleken, ha nem tölti ki a képernyőt */
-        body { margin: 0; overflow: hidden; background: #000; font-family: sans-serif; display: flex; justify-content: center; align-items: center; height: 100vh; touch-action: none; }
+        body { 
+            margin: 0; overflow: hidden; background: #000; 
+            display: flex; justify-content: center; align-items: center; 
+            height: 100vh; font-family: sans-serif; touch-action: none;
+        }
         
-        /* A játék vászna - itt fixáljuk az élességet */
-        canvas { 
-            background: #fff; 
-            max-width: 100%; 
-            max-height: 100%; 
-            image-rendering: -webkit-optimize-contrast; /* Élesítés Chrome/Safari alatt */
-            image-rendering: crisp-edges;
-            box-shadow: 0 0 20px rgba(255,255,255,0.1);
+        /* A JÁTÉKTERÜLET - Arányos marad, nem nyúlik meg */
+        #game-container {
+            position: relative;
+            aspect-ratio: 1100 / 600;
+            width: 100%;
+            max-width: 1100px;
+            max-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
         }
 
+        canvas { 
+            width: 100%; height: 100%;
+            background: #fff; 
+            image-rendering: -webkit-optimize-contrast;
+            image-rendering: crisp-edges;
+            display: block;
+        }
+
+        /* NAGY ÉS SZÉP MENÜ */
         #menu { 
             position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); 
-            text-align: center; background: rgba(255,255,255,0.95); 
-            padding: 25px; border-radius: 15px; z-index: 100; width: 300px;
+            text-align: center; background: rgba(255,255,255,0.96); 
+            padding: 30px; border-radius: 20px; z-index: 100; 
+            width: 80%; max-width: 400px;
+            box-shadow: 0 0 50px rgba(0,0,0,0.5);
         }
-        #menu img { width: 100%; border-radius: 10px; margin-bottom: 10px; }
-        input { padding: 10px; width: 80%; margin-bottom: 10px; font-size: 16px; }
-        button { padding: 15px; width: 90%; background: #e74c3c; color: white; border: none; border-radius: 8px; font-size: 20px; font-weight: bold; cursor: pointer; }
+        #menu img { width: 100%; border-radius: 10px; margin-bottom: 20px; }
+        input { padding: 15px; width: 85%; margin-bottom: 15px; font-size: 18px; border-radius: 8px; border: 2px solid #ddd; }
+        button { padding: 20px; width: 95%; background: #e74c3c; color: white; border: none; border-radius: 10px; font-size: 22px; font-weight: bold; cursor: pointer; transition: 0.2s; }
+        button:active { background: #c0392b; transform: scale(0.98); }
     </style>
 </head>
 <body>
 
-<div id="menu">
-    <img src="landingpage.png">
-    <input type="text" id="playerName" placeholder="NER-társ neve..." maxlength="12">
-    <button id="startBtn">INDÍTÁS</button>
+<div id="game-container">
+    <div id="menu">
+        <img src="landingpage.png">
+        <input type="text" id="playerName" placeholder="NER-társ neve..." maxlength="12">
+        <button id="startBtn">INDÍTÁS / START</button>
+    </div>
+    <canvas id="gameCanvas" width="1100" height="600"></canvas>
 </div>
-
-<canvas id="gameCanvas" width="1100" height="600"></canvas>
 
 <script>
 const canvas = document.getElementById('gameCanvas');
@@ -50,7 +68,6 @@ let points = 0;
 let playerName = "Lölő";
 let bgX = 0;
 
-// --- ASSETEK ---
 function loadImg(src) { const img = new Image(); img.src = src; return img; }
 const imgRun = [loadImg("ViktorRun1.png"), loadImg("ViktorRun2.png")];
 const imgJump = loadImg("ViktorJump.png");
@@ -80,7 +97,6 @@ startBtn.onclick = function() {
     requestAnimationFrame(gameLoop);
 };
 
-// IRÁNYÍTÁS (EGERET ÉS ÉRINTÉST IS KEZEL)
 function inputStart() { if(!gameRunning) return; touchStartTime = Date.now(); isTouching = true; }
 function inputEnd() {
     if(!gameRunning) return;
@@ -113,9 +129,9 @@ function update() {
     }
 
     obstacleTimer++;
-    if (obstacleTimer > 130 && Math.random() < 0.01) {
+    if (obstacleTimer > 140 && Math.random() < 0.01) {
         const isHeli = Math.random() > 0.7;
-        obstacles.push({ x: 1100, y: isHeli ? 280 : 430, w: 80, h: 80, img: isHeli ? imgHeli[0] : imgAvo[0] });
+        obstacles.push({ x: 1100, y: isHeli ? 280 : 430, w: 85, h: 85, img: isHeli ? imgHeli[0] : imgAvo[0] });
         obstacleTimer = 0;
     }
 
@@ -138,7 +154,7 @@ function update() {
 function draw() {
     ctx.clearRect(0, 0, 1100, 600);
     
-    // FIX HÁTTÉR - Pontosan 1100x600 (Nincs torzítás)
+    // FIX HÁTTÉR - Pontosan 1100x600 (A CSS fogja arányosan skálázni)
     ctx.drawImage(imgBg, Math.floor(bgX), 0, 1100, 600);
     ctx.drawImage(imgBg, Math.floor(bgX + 1100), 0, 1100, 600);
 
@@ -152,7 +168,7 @@ function draw() {
 
     obstacles.forEach(obs => ctx.drawImage(obs.img, obs.x, obs.y, obs.w, obs.h));
 
-    ctx.fillStyle = "black"; ctx.font = "bold 26px Arial";
+    ctx.fillStyle = "black"; ctx.font = "bold 28px Arial";
     ctx.fillText(`NER: ${playerName} | Közpénz: ${points}`, 30, 50);
 }
 </script>
