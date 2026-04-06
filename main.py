@@ -3,8 +3,8 @@ import random
 import asyncio
 import os
 
-# Inicializálás
-pygame.mixer.pre_init(44100, -16, 2, 4096) # 2048-ról 4096-ra emelve
+# --- INICIALIZÁLÁS (Tisztább hang beállításokkal) ---
+pygame.mixer.pre_init(44100, -16, 2, 4096)
 pygame.init()
 pygame.mixer.init()
 
@@ -12,7 +12,7 @@ pygame.mixer.init()
 SCREEN_WIDTH = 1100
 SCREEN_HEIGHT = 600
 SCREEN = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
-pygame.display.set_caption("Vége van kicsi")
+pygame.display.set_caption("Viktor Kalandjai")
 
 # --- ASSET BETÖLTÉS ---
 def load_img(name, scale=None):
@@ -32,7 +32,7 @@ def load_sd(name):
     except:
         return None
 
-# --- ASSETS (JAVÍTOTT FÁJLNEVEKKEL) ---
+# --- ASSETS (Kisbetűs fájlnevek a GitHubhoz igazítva) ---
 RUNNING = [load_img("ViktorRun1.png"), load_img("ViktorRun2.png")]
 JUMPING = load_img("ViktorJump.png")
 DUCKING = [load_img("ViktorDuck1.png"), load_img("ViktorDuck2.png")]
@@ -42,7 +42,7 @@ HELI = [load_img("heli1.png"), load_img("heli2.png")]
 CLOUD_IMG = load_img("Cloud.png") 
 LANDING_PAGE = load_img("landingpage.png", (SCREEN_WIDTH, SCREEN_HEIGHT))
 
-# Háttér (background.png is kisbetűs a GitHubon!)
+# Háttér panoráma kezelése
 try:
     orig_bg = pygame.image.load("background.png").convert()
     bg_ratio = orig_bg.get_width() / orig_bg.get_height()
@@ -72,16 +72,18 @@ class Viktosaur:
         self.is_run, self.is_jump, self.is_duck = True, False, False
         self.mask = pygame.mask.from_surface(self.image)
 
-    def update(self, userInput):
+    def update(self, userInput, touch_jump):
         if self.is_run: self.run()
         if self.is_jump: self.jump()
         if self.is_duck: self.duck()
 
         if self.step_index >= 10: self.step_index = 0
 
-        if userInput[pygame.K_UP] and not self.is_jump:
+        # Ugrik, ha: FEL nyíl VAGY érintés (mobil)
+        if (userInput[pygame.K_UP] or touch_jump) and not self.is_jump:
             self.is_run, self.is_jump, self.is_duck = False, True, False
             if jump_sound: jump_sound.play()
+        # Kacsázik: LE nyíl
         elif userInput[pygame.K_DOWN] and not self.is_jump:
             if not self.is_duck and duck_sound: 
                 duck_sound.play()
@@ -90,7 +92,7 @@ class Viktosaur:
             self.is_run, self.is_jump, self.is_duck = True, False, False
 
     def run(self):
-        self.image = self.run_img_to_use = RUNNING[self.step_index // 5]
+        self.image = RUNNING[self.step_index // 5]
         self.rect = self.image.get_rect(topleft=(self.X_POS, self.Y_POS))
         self.step_index += 1
         self.mask = pygame.mask.from_surface(self.image)
@@ -122,8 +124,8 @@ class Cloud:
         self.image = CLOUD_IMG
         self.width = self.image.get_width()
 
-    def update(self):
-        self.x -= game_speed * 0.4
+    def update(self, speed):
+        self.x -= speed * 0.4
         if self.x < -self.width:
             self.x = SCREEN_WIDTH + random.randint(800, 1000)
             self.y = random.randint(50, 150)
@@ -147,7 +149,7 @@ class Obstacle:
     def draw(self, screen):
         screen.blit(self.image, self.rect)
 
-# --- FŐ CIKLUS ---
+# --- JÁTÉKMENET ---
 async def main_game(name):
     global game_speed, x_pos_bg, points, obstacles
     run = True
@@ -167,12 +169,14 @@ async def main_game(name):
         pass
 
     while run:
+        touch_jump = False
         for event in pygame.event.get():
             if event.type == pygame.QUIT: return
+            if event.type == pygame.FINGERDOWN: touch_jump = True
 
         SCREEN.fill((255, 255, 255))
         
-        # Háttér mozgatás
+        # Háttér rajzolása
         SCREEN.blit(BACKGROUND, (x_pos_bg, 0))
         if x_pos_bg + BACKGROUND.get_width() < SCREEN_WIDTH:
             SCREEN.blit(BACKGROUND, (x_pos_bg + BACKGROUND.get_width(), 0))
@@ -180,11 +184,11 @@ async def main_game(name):
         if x_pos_bg <= -BACKGROUND.get_width(): x_pos_bg = 0
 
         cloud.draw(SCREEN)
-        cloud.update()
+        cloud.update(game_speed)
 
         userInput = pygame.key.get_pressed()
         player.draw(SCREEN)
-        player.update(userInput)
+        player.update(userInput, touch_jump)
 
         if len(obstacles) == 0:
             choice = random.randint(0, 2)
@@ -212,8 +216,9 @@ async def main_game(name):
 
         pygame.display.flip()
         clock.tick(30)
-        await asyncio.sleep(0)
+        await asyncio.sleep(0.01) # A recsegés ellen segít
 
+# --- MENÜ ---
 async def menu():
     player_name = ""
     font = pygame.font.Font(None, 50)
@@ -224,8 +229,10 @@ async def menu():
         else:
             SCREEN.fill((200, 200, 200))
 
+        touch_start = False
         for event in pygame.event.get():
             if event.type == pygame.QUIT: return
+            if event.type == pygame.FINGERDOWN: touch_start = True
             if event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_RETURN and player_name:
                     await main_game(player_name)
@@ -235,14 +242,18 @@ async def menu():
                 else:
                     if len(player_name) < 12:
                         player_name += event.unicode
+        
+        # Mobilos indítás név nélkül
+        if touch_start:
+            await main_game("Vendég")
 
-        msg = font.render("Írd be a neved és nyomj ENTER-t!", True, (0, 0, 0))
-        SCREEN.blit(msg, (SCREEN_WIDTH//2 - 250, SCREEN_HEIGHT//2 - 50))
+        msg = font.render("Írd be a neved és ENTER, vagy bökj rá!", True, (0, 0, 0))
+        SCREEN.blit(msg, (SCREEN_WIDTH//2 - 300, SCREEN_HEIGHT//2 - 50))
         name_surf = font.render(player_name + "_", True, (255, 0, 0))
         SCREEN.blit(name_surf, (SCREEN_WIDTH//2 - 50, SCREEN_HEIGHT//2 + 20))
 
         pygame.display.flip()
-        await asyncio.sleep(0)
+        await asyncio.sleep(0.01)
 
 if __name__ == "__main__":
     asyncio.run(menu())
