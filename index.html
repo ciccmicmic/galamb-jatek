@@ -5,13 +5,62 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>NER-lovag Kalandjai</title>
     <style>
-        body { margin: 0; overflow: hidden; background: #000; display: flex; justify-content: center; align-items: center; height: 100vh; font-family: 'Arial', sans-serif; touch-action: none; -webkit-user-select: none; user-select: none; }
-        #game-container { position: relative; aspect-ratio: 1100 / 600; width: 100%; max-width: 1100px; max-height: 100vh; }
-        canvas { width: 100%; height: 100%; background: #fff; display: block; image-rendering: -webkit-optimize-contrast; }
-        #menu { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); text-align: center; background: rgba(255,255,255,0.98); padding: 20px; border-radius: 15px; z-index: 9999; width: 85%; max-width: 320px; box-shadow: 0 0 30px rgba(0,0,0,0.5); }
-        #menu img { width: 100%; border-radius: 10px; margin-bottom: 15px; }
-        input { padding: 12px; width: 85%; margin-bottom: 15px; font-size: 18px; border-radius: 8px; border: 2px solid #ccc; outline: none; }
-        button { padding: 15px; width: 95%; background: #e74c3c; color: white; border: none; border-radius: 10px; font-size: 20px; font-weight: bold; cursor: pointer; }
+        body { 
+            margin: 0; overflow: hidden; background: #000; 
+            display: flex; justify-content: center; align-items: center; 
+            height: 100vh; font-family: 'Arial', sans-serif; 
+            touch-action: none; -webkit-user-select: none; user-select: none;
+        }
+        #game-container { 
+            position: relative; aspect-ratio: 1100 / 600; 
+            width: 100%; max-width: 1100px; max-height: 100vh; 
+        }
+        canvas { 
+            width: 100%; height: 100%; background: #fff; 
+            display: block; image-rendering: -webkit-optimize-contrast; 
+        }
+        
+        /* NAGYOBB, RÉSZLETGAZDAG MENÜ */
+        #menu { 
+            position: absolute; 
+            top: 50%; left: 50%; 
+            transform: translate(-50%, -50%); 
+            text-align: center; 
+            background: rgba(255,255,255,0.98); 
+            padding: 30px; 
+            border-radius: 20px; 
+            z-index: 9999; 
+            width: 85%; 
+            max-width: 850px; 
+            box-shadow: 0 0 50px rgba(0,0,0,0.6); 
+        }
+        #menu img { 
+            width: 100%; 
+            border-radius: 12px; 
+            margin-bottom: 20px; 
+        }
+        input { 
+            padding: 15px; 
+            width: 70%; 
+            margin-bottom: 20px; 
+            font-size: 20px; 
+            border-radius: 10px; 
+            border: 2px solid #ccc; 
+            outline: none; 
+        }
+        button { 
+            padding: 18px; 
+            width: 80%; 
+            background: #e74c3c; 
+            color: white; 
+            border: none; 
+            border-radius: 12px; 
+            font-size: 24px; 
+            font-weight: bold; 
+            cursor: pointer; 
+            transition: transform 0.1s;
+        }
+        button:active { transform: scale(0.98); }
     </style>
 </head>
 <body>
@@ -46,7 +95,7 @@ const imgJump = loadImg("ViktorJump.png");
 const imgDuck = [loadImg("ViktorDuck1.png"), loadImg("ViktorDuck2.png")];
 const imgBg = loadImg("background.png"); 
 
-// ÖSSZES AKADÁLY LISTÁZÁSA
+// AKADÁLYOK LISTÁJA
 const helis = [loadImg("heli1.png"), loadImg("heli2.png")];
 const avos = [
     loadImg("SmallAvocado1.png"), loadImg("SmallAvocado2.png"), loadImg("SmallAvocado3.png"),
@@ -57,7 +106,7 @@ const avos = [
 const bgMusic = new Audio("background_music.ogg");
 bgMusic.loop = true;
 const sndJump = new Audio("jump.ogg");
-const sndGameOver = new Audio("game_over.ogg"); // Javítva az új fájlnévre
+const sndGameOver = new Audio("game_over.ogg");
 
 const player = { x: 80, y: 400, w: 110, h: 120, velY: 0, gravity: 1000, isJumping: false, isDucking: false, frameTimer: 0 };
 let obstacles = [];
@@ -116,22 +165,11 @@ function update(dt) {
 
     obstacleTimer += dt;
     if (obstacleTimer > 1.6) {
-        if (Math.random() < 0.03) { // Kicsit növelt esély a spawn-ra
+        if (Math.random() < 0.03) {
             const isHeli = Math.random() > 0.7;
-            let selectedImg;
-            
-            if (isHeli) {
-                selectedImg = helis[Math.floor(Math.random() * helis.length)];
-            } else {
-                selectedImg = avos[Math.floor(Math.random() * avos.length)];
-            }
+            let selectedImg = isHeli ? helis[Math.floor(Math.random() * helis.length)] : avos[Math.floor(Math.random() * avos.length)];
 
-            obstacles.push({ 
-                x: 1150, 
-                y: isHeli ? 280 : 430, 
-                w: 85, h: 85, 
-                img: selectedImg 
-            });
+            obstacles.push({ x: 1150, y: isHeli ? 280 : 430, w: 85, h: 85, img: selectedImg });
             obstacleTimer = 0;
         }
     }
