@@ -3,12 +3,12 @@ import random
 import asyncio
 import os
 
-# --- INICIALIZÁLÁS ---
+# --- INICIALIZÁLÁS (Tisztább hang és puffer) ---
 pygame.mixer.pre_init(44100, -16, 2, 4096)
 pygame.init()
 pygame.mixer.init()
 
-# Alapméret (ezt fogja a Pygbag skálázni a böngészőben)
+# Alapméret (Pygbag skálázza a böngészőben)
 SCREEN_WIDTH = 1100
 SCREEN_HEIGHT = 600
 SCREEN = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
@@ -21,15 +21,16 @@ def load_img(name, scale=None):
         if scale: img = pygame.transform.scale(img, scale)
         return img
     except:
+        # Ha hibás a fájl, egy sárga kockát teszünk be, hogy ne álljon le a program
         surf = pygame.Surface(scale if scale else (50, 50))
-        surf.fill((255, 0, 0)) 
+        surf.fill((255, 255, 0)) 
         return surf
 
 def load_sd(name):
     try: return pygame.mixer.Sound(name)
     except: return None
 
-# Képek
+# Képek betöltése
 RUNNING = [load_img("ViktorRun1.png"), load_img("ViktorRun2.png")]
 JUMPING = load_img("ViktorJump.png")
 DUCKING = [load_img("ViktorDuck1.png"), load_img("ViktorDuck2.png")]
@@ -39,7 +40,7 @@ HELI = [load_img("heli1.png"), load_img("heli2.png")]
 CLOUD_IMG = load_img("Cloud.png") 
 LANDING_PAGE = load_img("landingpage.png", (SCREEN_WIDTH, SCREEN_HEIGHT))
 
-# Háttér
+# Háttér betöltés és skálázás
 try:
     orig_bg = pygame.image.load("background.png").convert()
     bg_ratio = orig_bg.get_width() / orig_bg.get_height()
@@ -76,12 +77,12 @@ class Viktosaur:
 
         if self.step_index >= 10: self.step_index = 0
 
-        # Irányítás: Billentyűzet FEL / Rövid klikk -> Ugrás
+        # Ugrik: FEL nyíl vagy rövid klikk
         if (userInput[pygame.K_UP] or jump_trigger) and not self.is_jump:
             self.is_run, self.is_jump, self.is_duck = False, True, False
             if jump_sound: jump_sound.play()
         
-        # Irányítás: Billentyűzet LE / Hosszú klikk -> Kacsázás
+        # Kacsázik: LE nyíl vagy hosszú nyomva tartás
         elif (userInput[pygame.K_DOWN] or is_holding_duck) and not self.is_jump:
             if not self.is_duck and duck_sound: 
                 duck_sound.play()
@@ -185,23 +186,27 @@ async def main_game(name):
             # Kattintás/Érintés vége
             if event.type in [pygame.MOUSEBUTTONUP, pygame.FINGERUP]:
                 duration = pygame.time.get_ticks() - click_start_time
-                if duration < 200: # Rövid nyomás -> Ugrás
+                if duration < 200: # Rövid bökés -> Ugrás
                     jump_trigger = True
                 is_clicking = False
                 is_holding_duck = False
 
+        # Ha nyomva tartjuk (200ms felett) -> Guggolás
         if is_clicking:
             if (pygame.time.get_ticks() - click_start_time) >= 200:
                 is_holding_duck = True
 
         SCREEN.fill((255, 255, 255))
         
-        # Háttér scrollozás
-        SCREEN.blit(BACKGROUND, (x_pos_bg, 0))
+        # --- HÁTTÉR MOZGATÁS (Lassítva, hogy ne vibráljon) ---
+        x_pos_bg -= game_speed * 0.15 # Fix lassabb tempó a parallax hatáshoz
+        
+        SCREEN.blit(BACKGROUND, (int(x_pos_bg), 0))
         if x_pos_bg + BACKGROUND.get_width() < SCREEN_WIDTH:
-            SCREEN.blit(BACKGROUND, (x_pos_bg + BACKGROUND.get_width(), 0))
-        x_pos_bg -= game_speed * 0.5
-        if x_pos_bg <= -BACKGROUND.get_width(): x_pos_bg = 0
+            SCREEN.blit(BACKGROUND, (int(x_pos_bg + BACKGROUND.get_width()), 0))
+        
+        if x_pos_bg <= -BACKGROUND.get_width():
+            x_pos_bg = 0
 
         cloud.draw(SCREEN)
         cloud.update(game_speed)
@@ -210,6 +215,7 @@ async def main_game(name):
         player.draw(SCREEN)
         player.update(userInput, jump_trigger, is_holding_duck)
 
+        # Akadályok generálása
         if len(obstacles) == 0:
             choice = random.randint(0, 2)
             if choice == 0: obstacles.append(Obstacle(SMALL_AVOCADO))
@@ -254,6 +260,7 @@ async def menu():
         for event in pygame.event.get():
             if event.type == pygame.QUIT: return
             
+            # Első bökésre elindul a zene mobilon is
             if event.type in [pygame.MOUSEBUTTONDOWN, pygame.FINGERDOWN, pygame.KEYDOWN]:
                 if not music_started:
                     try:
