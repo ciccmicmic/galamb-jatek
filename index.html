@@ -1,74 +1,160 @@
-<style>
-    /* A háttér fekete lesz a széleken, ha túl széles a monitor */
-    body { 
-        margin: 0; 
-        overflow: hidden; 
-        background: #000; 
-        display: flex; 
-        justify-content: center; 
-        align-items: center; 
-        height: 100vh;
-        touch-action: none;
-    }
-    canvas { 
-        background: #fff; 
-        box-shadow: 0 0 50px rgba(0,0,0,0.5);
-        /* Élesítés (pixel art hatás) */
-        image-rendering: pixelated; 
-    }
-</style>
+<!DOCTYPE html>
+<html lang="hu">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>NER-lovag Kalandjai</title>
+    <style>
+        /* Sötét háttér a széleken, ha nem tölti ki a képernyőt */
+        body { margin: 0; overflow: hidden; background: #000; font-family: sans-serif; display: flex; justify-content: center; align-items: center; height: 100vh; touch-action: none; }
+        
+        /* A játék vászna - itt fixáljuk az élességet */
+        canvas { 
+            background: #fff; 
+            max-width: 100%; 
+            max-height: 100%; 
+            image-rendering: -webkit-optimize-contrast; /* Élesítés Chrome/Safari alatt */
+            image-rendering: crisp-edges;
+            box-shadow: 0 0 20px rgba(255,255,255,0.1);
+        }
+
+        #menu { 
+            position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); 
+            text-align: center; background: rgba(255,255,255,0.95); 
+            padding: 25px; border-radius: 15px; z-index: 100; width: 300px;
+        }
+        #menu img { width: 100%; border-radius: 10px; margin-bottom: 10px; }
+        input { padding: 10px; width: 80%; margin-bottom: 10px; font-size: 16px; }
+        button { padding: 15px; width: 90%; background: #e74c3c; color: white; border: none; border-radius: 8px; font-size: 20px; font-weight: bold; cursor: pointer; }
+    </style>
+</head>
+<body>
+
+<div id="menu">
+    <img src="landingpage.png">
+    <input type="text" id="playerName" placeholder="NER-társ neve..." maxlength="12">
+    <button id="startBtn">INDÍTÁS</button>
+</div>
+
+<canvas id="gameCanvas" width="1100" height="600"></canvas>
 
 <script>
-// Cseréld le a resize függvényt erre:
-function resize() {
-    const targetRatio = 1100 / 600; // A fix játék arány
-    let newWidth = window.innerWidth;
-    let newHeight = window.innerHeight;
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d');
+const menu = document.getElementById('menu');
+const startBtn = document.getElementById('startBtn');
 
-    // Megnézzük, hogy az ablak aránya szélesebb-e, mint a játéké
-    if (newWidth / newHeight > targetRatio) {
-        newWidth = newHeight * targetRatio;
-    } else {
-        newHeight = newWidth / targetRatio;
+let gameRunning = false;
+let gameSpeed = 7;
+let points = 0;
+let playerName = "Lölő";
+let bgX = 0;
+
+// --- ASSETEK ---
+function loadImg(src) { const img = new Image(); img.src = src; return img; }
+const imgRun = [loadImg("ViktorRun1.png"), loadImg("ViktorRun2.png")];
+const imgJump = loadImg("ViktorJump.png");
+const imgDuck = [loadImg("ViktorDuck1.png"), loadImg("ViktorDuck2.png")];
+const imgBg = loadImg("background.png");
+const imgHeli = [loadImg("heli1.png"), loadImg("heli2.png")];
+const imgAvo = [loadImg("SmallAvocado1.png"), loadImg("LargeAvocado1.png")];
+
+const bgMusic = new Audio("background_music.ogg");
+bgMusic.loop = true;
+const sndJump = new Audio("jump.ogg");
+const sndDuck = new Audio("duck.ogg");
+const sndHit = new Audio("collision.ogg");
+
+const player = { x: 80, y: 400, w: 110, h: 120, velY: 0, gravity: 0.7, isJumping: false, isDucking: false, frameTimer: 0 };
+let obstacles = [];
+let touchStartTime = 0;
+let isTouching = false;
+let obstacleTimer = 0;
+
+startBtn.onclick = function() {
+    const inputName = document.getElementById('playerName').value;
+    if (inputName) playerName = inputName;
+    bgMusic.play().catch(()=>{});
+    menu.style.display = 'none';
+    gameRunning = true;
+    requestAnimationFrame(gameLoop);
+};
+
+// IRÁNYÍTÁS (EGERET ÉS ÉRINTÉST IS KEZEL)
+function inputStart() { if(!gameRunning) return; touchStartTime = Date.now(); isTouching = true; }
+function inputEnd() {
+    if(!gameRunning) return;
+    if(Date.now() - touchStartTime < 200 && !player.isJumping) {
+        player.velY = -15; player.isJumping = true; sndJump.play().catch(()=>{});
     }
-
-    // A vászon méreteit beállítjuk a kiszámolt, arányos értékre
-    canvas.width = 1100; // Belső felbontás fix marad az élességért
-    canvas.height = 600;
-
-    // A megjelenítési méretet a CSS-sel skálázzuk
-    canvas.style.width = newWidth + 'px';
-    canvas.style.height = newHeight + 'px';
-
-    // Viktor pozíciója a fix 600-as magassághoz képest
-    player.y = 400; 
+    isTouching = false; player.isDucking = false;
 }
 
-// A draw függvényben is fixáljuk a hátteret:
-function draw() {
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
+window.onmousedown = inputStart; window.onmouseup = inputEnd;
+window.ontouchstart = (e) => { e.preventDefault(); inputStart(); };
+window.ontouchend = (e) => { e.preventDefault(); inputEnd(); };
 
-    // Itt most már nem kell scale-ezni, mert a vászon fix 1100x600
-    ctx.drawImage(imgBg, bgX, 0, 1100, 600);
-    ctx.drawImage(imgBg, bgX + 1100, 0, 1100, 600);
-    
+function gameLoop() {
+    if (!gameRunning) return;
+    update();
+    draw();
+    requestAnimationFrame(gameLoop);
+}
+
+function update() {
+    bgX -= gameSpeed * 0.15;
     if (bgX <= -1100) bgX = 0;
 
-    // Karakter és akadályok (fix 1100-as koordinátákkal)
+    if (isTouching && (Date.now() - touchStartTime > 200)) player.isDucking = true;
+
+    if (player.isJumping) {
+        player.y += player.velY; player.velY += player.gravity;
+        if (player.y >= 400) { player.y = 400; player.isJumping = false; }
+    }
+
+    obstacleTimer++;
+    if (obstacleTimer > 130 && Math.random() < 0.01) {
+        const isHeli = Math.random() > 0.7;
+        obstacles.push({ x: 1100, y: isHeli ? 280 : 430, w: 80, h: 80, img: isHeli ? imgHeli[0] : imgAvo[0] });
+        obstacleTimer = 0;
+    }
+
+    obstacles.forEach((obs, i) => {
+        obs.x -= gameSpeed;
+        if (player.x < obs.x + obs.w - 20 && player.x + player.w - 20 > obs.x + 20 && 
+            (player.isDucking ? player.y + 50 : player.y) < obs.y + obs.h - 20 && 
+            player.y + player.h > obs.y + 20) {
+             sndHit.play(); bgMusic.pause(); gameRunning = false;
+             setTimeout(() => location.reload(), 1500);
+        }
+        if (obs.x < -100) obstacles.splice(i, 1);
+    });
+
+    points++;
+    if (points % 600 === 0) gameSpeed += 0.4;
+    player.frameTimer++;
+}
+
+function draw() {
+    ctx.clearRect(0, 0, 1100, 600);
+    
+    // FIX HÁTTÉR - Pontosan 1100x600 (Nincs torzítás)
+    ctx.drawImage(imgBg, Math.floor(bgX), 0, 1100, 600);
+    ctx.drawImage(imgBg, Math.floor(bgX + 1100), 0, 1100, 600);
+
     let currentImg = imgRun[Math.floor(player.frameTimer / 6) % 2];
     if (player.isJumping) currentImg = imgJump;
     if (player.isDucking) currentImg = imgDuck[Math.floor(player.frameTimer / 6) % 2];
 
-    const drawH = player.isDucking ? player.h * 0.7 : player.h;
-    const drawY = player.isDucking ? player.y + (player.h * 0.3) : player.y;
-    ctx.drawImage(currentImg, player.x, drawY, player.w, drawH);
+    const dH = player.isDucking ? player.h * 0.7 : player.h;
+    const dY = player.isDucking ? player.y + (player.h * 0.3) : player.y;
+    ctx.drawImage(currentImg, player.x, dY, player.w, dH);
 
-    obstacles.forEach(obs => {
-        ctx.drawImage(obs.img, obs.x, obs.y, obs.w, obs.h);
-    });
+    obstacles.forEach(obs => ctx.drawImage(obs.img, obs.x, obs.y, obs.w, obs.h));
 
-    ctx.fillStyle = "black";
-    ctx.font = "bold 24px Arial";
-    ctx.fillText(`NER: ${playerName} | Közpénz: ${points}`, 20, 40);
+    ctx.fillStyle = "black"; ctx.font = "bold 26px Arial";
+    ctx.fillText(`NER: ${playerName} | Közpénz: ${points}`, 30, 50);
 }
 </script>
+</body>
+</html>
