@@ -6,25 +6,25 @@
     <title>NER-lovag Kalandjai</title>
     <style>
         body { margin: 0; overflow: hidden; background: #1a1a1a; font-family: sans-serif; touch-action: none; }
-        canvas { display: block; margin: 0 auto; background: #fff; border: 2px solid #444; }
+        canvas { display: block; margin: 0 auto; background: #fff; }
         
         #menu { 
             position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); 
             text-align: center; background: rgba(255,255,255,0.98); 
-            padding: 35px; border-radius: 25px; box-shadow: 0 0 40px rgba(0,0,0,0.8); 
-            z-index: 10; width: 85%; max-width: 500px; 
+            padding: 30px; border-radius: 20px; box-shadow: 0 0 40px rgba(0,0,0,0.8); 
+            z-index: 10; width: 85%; max-width: 450px; 
         }
         
-        #menu img { width: 100%; height: auto; border-radius: 15px; margin-bottom: 20px; }
-        input { padding: 15px; font-size: 20px; margin-bottom: 15px; border-radius: 10px; border: 2px solid #ddd; width: 85%; }
-        button { padding: 20px; font-size: 24px; cursor: pointer; background: #e74c3c; color: white; border: none; border-radius: 10px; font-weight: bold; width: 100%; }
+        #menu img { width: 100%; height: auto; border-radius: 10px; margin-bottom: 15px; }
+        input { padding: 12px; font-size: 18px; margin-bottom: 12px; border-radius: 8px; border: 2px solid #ddd; width: 85%; }
+        button { padding: 18px; font-size: 22px; cursor: pointer; background: #e74c3c; color: white; border: none; border-radius: 8px; font-weight: bold; width: 95%; }
     </style>
 </head>
 <body>
 
 <div id="menu">
     <img src="landingpage.png">
-    <input type="text" id="playerName" placeholder="Neved, NER-társ?" maxlength="12"><br>
+    <input type="text" id="playerName" placeholder="NER-név..." maxlength="12"><br>
     <button id="startBtn">INDÍTÁS</button>
 </div>
 
@@ -37,12 +37,11 @@ const menu = document.getElementById('menu');
 const startBtn = document.getElementById('startBtn');
 
 let gameRunning = false;
-let gameSpeed = 7; // LELASSÍTVA (korábban 10 volt)
+let gameSpeed = 7; 
 let points = 0;
 let playerName = "Lölő";
 let bgX = 0;
 
-// --- ASSETEK ---
 function loadImg(src) { const img = new Image(); img.src = src; return img; }
 const imgRun = [loadImg("ViktorRun1.png"), loadImg("ViktorRun2.png")];
 const imgJump = loadImg("ViktorJump.png");
@@ -58,7 +57,7 @@ const sndDuck = new Audio("duck.ogg");
 const sndHit = new Audio("collision.ogg");
 
 const player = {
-    x: 80, y: 0, w: 120, h: 130, // MÉG NAGYOBB VIKTOR
+    x: 80, y: 0, w: 120, h: 130,
     velY: 0, gravity: 0.7,
     isJumping: false, isDucking: false,
     frameTimer: 0
@@ -67,7 +66,7 @@ const player = {
 let obstacles = [];
 let touchStartTime = 0;
 let isTouching = false;
-let nextObstacleTimer = 0; // ÚJ: Időzítő az akadályoknak
+let obstacleTimer = 0;
 
 startBtn.addEventListener('click', function() {
     const inputName = document.getElementById('playerName').value;
@@ -84,12 +83,10 @@ function handleInputEnd() {
     if (!gameRunning) return;
     let duration = Date.now() - touchStartTime;
     if (duration < 200 && !player.isJumping) {
-        player.velY = -15;
-        player.isJumping = true;
+        player.velY = -15; player.isJumping = true;
         sndJump.play().catch(()=>{});
     }
-    isTouching = false;
-    player.isDucking = false;
+    isTouching = false; player.isDucking = false;
 }
 
 window.addEventListener('mousedown', handleInputStart);
@@ -118,8 +115,8 @@ function gameLoop() {
 }
 
 function update() {
-    // Parallax háttér lassabb úszás
-    bgX -= gameSpeed * 0.12;
+    // Parallax mozgás (sebességhez kötve)
+    bgX -= gameSpeed * 0.15;
 
     if (isTouching && (Date.now() - touchStartTime > 200)) {
         player.isDucking = true;
@@ -134,28 +131,25 @@ function update() {
         }
     }
 
-    // AKADÁLY GENERÁLÁS - Ritkítva
-    nextObstacleTimer++;
-    if (nextObstacleTimer > 100 && Math.random() < 0.01) {
-        const type = Math.random() > 0.4 ? 'avo' : 'heli';
+    // Akadály kezelés: lassabb kezdés, ritkább spawn
+    obstacleTimer++;
+    if (obstacleTimer > 120 && Math.random() < 0.01) {
+        const isHeli = Math.random() > 0.6;
         obstacles.push({
             x: canvas.width,
-            y: type === 'heli' ? canvas.height * 0.45 : canvas.height * 0.72,
+            y: isHeli ? canvas.height * 0.45 : canvas.height * 0.72,
             w: 80, h: 80,
-            img: type === 'heli' ? imgHeli[0] : imgAvo[0]
+            img: isHeli ? imgHeli[0] : imgAvo[0]
         });
-        nextObstacleTimer = 0; // Reset, hogy ne jöjjön rögtön a következő
+        obstacleTimer = 0;
     }
 
     obstacles.forEach((obs, i) => {
         obs.x -= gameSpeed;
-        // Ütközés finomítás
-        if (player.x < obs.x + obs.w - 20 && player.x + player.w - 20 > obs.x + 20 && 
-            (player.isDucking ? player.y + 50 : player.y) < obs.y + obs.h - 20 && 
-            player.y + player.h > obs.y + 20) {
-             sndHit.play();
-             bgMusic.pause();
-             gameRunning = false;
+        if (player.x < obs.x + obs.w - 25 && player.x + player.w - 25 > obs.x + 25 && 
+            (player.isDucking ? player.y + 50 : player.y) < obs.y + obs.h - 25 && 
+            player.y + player.h > obs.y + 25) {
+             sndHit.play(); bgMusic.pause(); gameRunning = false;
              setTimeout(() => location.reload(), 1500);
         }
         if (obs.x < -100) obstacles.splice(i, 1);
@@ -169,12 +163,18 @@ function update() {
 function draw() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-    // FIX HÁTTÉR - Kitölti a vásznat
-    ctx.drawImage(imgBg, bgX, 0, canvas.width, canvas.height);
-    ctx.drawImage(imgBg, bgX + canvas.width, 0, canvas.width, canvas.height);
-    if (bgX <= -canvas.width) bgX = 0;
+    // --- JAVÍTOTT HÁTTÉR RAJZOLÁS (NINCS TORZÍTÁS) ---
+    // Megszámoljuk, mekkora szélesség kell a képnek, hogy megtartsa az arányát a magassághoz képest
+    const bgScale = canvas.height / imgBg.height;
+    const bgScaledWidth = imgBg.width * bgScale;
 
-    // Viktor
+    ctx.drawImage(imgBg, bgX, 0, bgScaledWidth, canvas.height);
+    ctx.drawImage(imgBg, bgX + bgScaledWidth, 0, bgScaledWidth, canvas.height);
+    
+    // Ha a kép kifut, visszaugrik (folytonos háttér)
+    if (bgX <= -bgScaledWidth) bgX = 0;
+
+    // Viktor rajzolása
     let currentImg = imgRun[Math.floor(player.frameTimer / 6) % 2];
     if (player.isJumping) currentImg = imgJump;
     if (player.isDucking) currentImg = imgDuck[Math.floor(player.frameTimer / 6) % 2];
@@ -186,7 +186,7 @@ function draw() {
     // Akadályok
     obstacles.forEach(obs => { ctx.drawImage(obs.img, obs.x, obs.y, obs.w, obs.h); });
 
-    // Szöveg
+    // Felirat
     ctx.fillStyle = "black";
     ctx.font = "bold 24px Arial";
     ctx.fillText(`NER: ${playerName} | Közpénz: ${points}`, 20, 40);
