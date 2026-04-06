@@ -4,7 +4,7 @@ import asyncio
 import os
 
 # Inicializálás
-pygame.mixer.pre_init(44100, -16, 2, 2048)
+pygame.mixer.pre_init(44100, -16, 2, 4096) # 2048-ról 4096-ra emelve
 pygame.init()
 pygame.mixer.init()
 
