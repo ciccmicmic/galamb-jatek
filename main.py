@@ -8,6 +8,7 @@ pygame.mixer.pre_init(44100, -16, 2, 4096)
 pygame.init()
 pygame.mixer.init()
 
+# Alapméret (ezt fogja a Pygbag skálázni a böngészőben)
 SCREEN_WIDTH = 1100
 SCREEN_HEIGHT = 600
 SCREEN = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
@@ -28,6 +29,7 @@ def load_sd(name):
     try: return pygame.mixer.Sound(name)
     except: return None
 
+# Képek
 RUNNING = [load_img("ViktorRun1.png"), load_img("ViktorRun2.png")]
 JUMPING = load_img("ViktorJump.png")
 DUCKING = [load_img("ViktorDuck1.png"), load_img("ViktorDuck2.png")]
@@ -37,6 +39,7 @@ HELI = [load_img("heli1.png"), load_img("heli2.png")]
 CLOUD_IMG = load_img("Cloud.png") 
 LANDING_PAGE = load_img("landingpage.png", (SCREEN_WIDTH, SCREEN_HEIGHT))
 
+# Háttér
 try:
     orig_bg = pygame.image.load("background.png").convert()
     bg_ratio = orig_bg.get_width() / orig_bg.get_height()
@@ -45,6 +48,7 @@ except:
     BACKGROUND = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT))
     BACKGROUND.fill((200, 200, 200))
 
+# Hangok
 jump_sound = load_sd("jump.ogg")
 duck_sound = load_sd("duck.ogg")
 collision_sound = load_sd("collision.ogg")
@@ -72,12 +76,12 @@ class Viktosaur:
 
         if self.step_index >= 10: self.step_index = 0
 
-        # UGRÁS: FEL nyíl VAGY rövid kattintás/érintés elengedése után
+        # Irányítás: Billentyűzet FEL / Rövid klikk -> Ugrás
         if (userInput[pygame.K_UP] or jump_trigger) and not self.is_jump:
             self.is_run, self.is_jump, self.is_duck = False, True, False
             if jump_sound: jump_sound.play()
         
-        # KACSÁZÁS: LE nyíl VAGY hosszú nyomva tartás (is_holding_duck)
+        # Irányítás: Billentyűzet LE / Hosszú klikk -> Kacsázás
         elif (userInput[pygame.K_DOWN] or is_holding_duck) and not self.is_jump:
             if not self.is_duck and duck_sound: 
                 duck_sound.play()
@@ -157,10 +161,8 @@ async def main_game(name):
     obstacles = []
     font = pygame.font.Font(None, 30)
 
-    # Kattintás időzítő változók
     click_start_time = 0
     is_clicking = False
-    jump_trigger = False
     is_holding_duck = False
 
     try:
@@ -171,21 +173,117 @@ async def main_game(name):
 
     while run:
         jump_trigger = False
-        dt = clock.get_time() / 1000.0 # Eltelt idő másodpercben
-
+        
         for event in pygame.event.get():
             if event.type == pygame.QUIT: return
             
-            # Kattintás vagy Érintés kezdete
-            if event.type == pygame.MOUSEBUTTONDOWN or event.type == pygame.FINGERDOWN:
+            # Kattintás/Érintés kezdete
+            if event.type in [pygame.MOUSEBUTTONDOWN, pygame.FINGERDOWN]:
                 click_start_time = pygame.time.get_ticks()
                 is_clicking = True
-                is_holding_duck = False
             
-            # Kattintás vagy Érintés vége
-            if event.type == pygame.MOUSEBUTTONUP or event.type == pygame.FINGERUP:
+            # Kattintás/Érintés vége
+            if event.type in [pygame.MOUSEBUTTONUP, pygame.FINGERUP]:
                 duration = pygame.time.get_ticks() - click_start_time
-                if duration < 150: # Rövid kattintás (150ms alatt) -> Ugrás
+                if duration < 200: # Rövid nyomás -> Ugrás
                     jump_trigger = True
                 is_clicking = False
-                is_holding_duck
+                is_holding_duck = False
+
+        if is_clicking:
+            if (pygame.time.get_ticks() - click_start_time) >= 200:
+                is_holding_duck = True
+
+        SCREEN.fill((255, 255, 255))
+        
+        # Háttér scrollozás
+        SCREEN.blit(BACKGROUND, (x_pos_bg, 0))
+        if x_pos_bg + BACKGROUND.get_width() < SCREEN_WIDTH:
+            SCREEN.blit(BACKGROUND, (x_pos_bg + BACKGROUND.get_width(), 0))
+        x_pos_bg -= game_speed * 0.5
+        if x_pos_bg <= -BACKGROUND.get_width(): x_pos_bg = 0
+
+        cloud.draw(SCREEN)
+        cloud.update(game_speed)
+
+        userInput = pygame.key.get_pressed()
+        player.draw(SCREEN)
+        player.update(userInput, jump_trigger, is_holding_duck)
+
+        if len(obstacles) == 0:
+            choice = random.randint(0, 2)
+            if choice == 0: obstacles.append(Obstacle(SMALL_AVOCADO))
+            elif choice == 1: obstacles.append(Obstacle(LARGE_AVOCADO))
+            else:
+                h = Obstacle(HELI)
+                h.rect.y = 280
+                obstacles.append(h)
+
+        for obstacle in obstacles:
+            obstacle.draw(SCREEN)
+            obstacle.update(game_speed, obstacles)
+            if player.mask.overlap(obstacle.mask, (obstacle.rect.x - player.rect.x, obstacle.rect.y - player.rect.y)):
+                if collision_sound: collision_sound.play()
+                pygame.mixer.music.stop()
+                if game_over_sound: game_over_sound.play()
+                await asyncio.sleep(2)
+                return
+
+        points += 1
+        if points % 100 == 0: game_speed += 1
+        txt = font.render(f"Pilóta: {name} | Pont: {points}", True, (0, 0, 0))
+        SCREEN.blit(txt, (40, 40))
+
+        pygame.display.flip()
+        clock.tick(30)
+        await asyncio.sleep(0.01)
+
+# --- MENÜ ---
+async def menu():
+    player_name = ""
+    font = pygame.font.Font(None, 50)
+    music_started = False
+    
+    while True:
+        if LANDING_PAGE:
+            SCREEN.blit(LANDING_PAGE, (0, 0))
+        else:
+            SCREEN.fill((200, 200, 200))
+
+        input_trigger = False
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT: return
+            
+            if event.type in [pygame.MOUSEBUTTONDOWN, pygame.FINGERDOWN, pygame.KEYDOWN]:
+                if not music_started:
+                    try:
+                        pygame.mixer.music.load("background_music.ogg")
+                        pygame.mixer.music.play(-1)
+                        music_started = True
+                    except: pass
+                
+                if event.type in [pygame.MOUSEBUTTONDOWN, pygame.FINGERDOWN] and not player_name:
+                    input_trigger = True
+
+            if event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_RETURN and player_name:
+                    await main_game(player_name)
+                    player_name = ""
+                elif event.key == pygame.K_BACKSPACE:
+                    player_name = player_name[:-1]
+                else:
+                    if len(player_name) < 12:
+                        player_name += event.unicode
+        
+        if input_trigger: await main_game("Vendég")
+
+        msg = font.render("Írd be a neved, vagy bökj rá!", True, (0, 0, 0))
+        SCREEN.blit(msg, (SCREEN_WIDTH//2 - 250, SCREEN_HEIGHT//2 - 50))
+        name_surf = font.render(player_name + "_", True, (255, 0, 0))
+        SCREEN.blit(name_surf, (SCREEN_WIDTH//2 - 50, SCREEN_HEIGHT//2 + 20))
+
+        pygame.display.flip()
+        await asyncio.sleep(0.01)
+
+if __name__ == "__main__":
+    asyncio.run(menu())
